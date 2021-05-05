@@ -4,6 +4,7 @@ import numpy as np
 import time
 
 # Esta classe pretende representar o algoritimo ABR usando a implementação BOLA.
+#  BOLA (Buffer Occupancy based Lyapunov Algorithm)
 
 
 class IR2A_IMPL(IR2A):
@@ -26,7 +27,6 @@ class IR2A_IMPL(IR2A):
         self.send_up(msg)
 
     def handle_segment_size_request(self, msg):
-        print('Enter in ABR algorithm')
         # O video foi segmentado de 6 maneiras diferentes e codificado em 20 formatos distintos
         QTD_FORMAT = 20
 
@@ -39,8 +39,8 @@ class IR2A_IMPL(IR2A):
         # Q_MAX = min(Q_MAX, T_RES)
 
         #  GAMMA_PARAMETER corresponde à intensidade com que queremos evitar o rebuffering.
-        #  TODO -  Deveria ser um valor dinamico, mas por simplicidade esta sendo inicializado manualmente
-        GAMMA_PARAMETER = 5
+        #  TODO -  Poderia ser um valor dinamico, mas por simplicidade esta sendo inicializado manualmente
+        GAMMA_PARAMETER = 3
 
         # time.perf_counter() retorna o tempo em que a mensagem será encaminhada para o singletton ConnectionHandler
         # request_time será usada posteriormente para calcular o valor de throughput
@@ -48,42 +48,44 @@ class IR2A_IMPL(IR2A):
 
         # Um desafio de implantação envolve a escolha do BOLA parâmetros γ(GAMMA_PARAMETER) e V(PARAM).
         # Parâmetro de controle definido pelo Bola para possibilitar troca entre o tamanho do buffer e desempenho
-        PARAM = ((Q_MAX - 1) / self.vM + GAMMA_PARAMETER)
+        PARAM = ((Q_MAX - 1) / (self.vM + GAMMA_PARAMETER))
 
-        # Salva em buffers = A lista de tamanho dos buffers
+        # Salva em buffers = A lista de tamanho dos buffers - o tamanho maximo do buffer é 60
         buffers = self.whiteboard.get_playback_buffer_size()
-
-        # salva em playback_qi = A lista com o índice de qualidade do vídeo
-        playback_qi = self.whiteboard.get_playback_qi()
-
         # Ennquanto o video não tem inicio o buffer é definido como 0
         if not buffers:
             buffers = ([0, 0], [0, 0])
-
-        m = 0
         # Seleciona o valor mais atual para o nível do buffer
         current_buffer = buffers[-1]
 
         # Escolhe o indice de qualidade
+        # m = taxa de bits
+        # Param = Vd, Sm = self.qi[i], S1 = self.qi[0]
+        m = 0
+        selected_qi = 0
         for i in range(QTD_FORMAT):
-            utility = np.log(self.qi[i] / self.qi[0])
-            m_candidate = (PARAM * utility + PARAM * 5 -
-                           current_buffer[1]) / self.qi[i]
+            #   função de utilidade logarítmica
+            self.vM = np.log(self.qi[i] / self.qi[0])
 
-            # Define o maior valor para a variavel m_candidate
-            if m < m_candidate:
-                m = m_candidate
+            m_actual = ((PARAM * self.vM) + (PARAM * GAMMA_PARAMETER) -
+                        current_buffer[1]) / self.qi[i]
+
+            # Define o maior valor para a variavel m_actual
+            if m < m_actual:
+                m = m_actual
                 selected_qi = i
 
+            # salva em playback_qi = A lista com o índice de qualidade do vídeo
+            playback_qi = self.whiteboard.get_playback_qi()
             # Verifica a lista com o índice de qualidade do vídeo
-            if playback_qi:
+            if len(playback_qi) > 0:
                 # Verifica se indice de qualidade definido é maior que o indice do segmento anterior,
                 if selected_qi > playback_qi[-1][1]:
                     m1 = 0
                     max = self.qi[0]
                     if (self.throughput >= self.qi[0]):
                         max = self.throughput
-                    for j in range(20):
+                    for j in range(QTD_FORMAT):
                         if (m1 <= j and self.qi[j] <= max):
                             m1 = j
                     # O indice é setado com um novo valor caso ele esteja incluido nos  indices antigos
@@ -95,12 +97,13 @@ class IR2A_IMPL(IR2A):
                     else:
                         m1 += 1
 
+                        # get_playback_pauses
+
                     selected_qi = m1
             # Possivel abandono
             # TODO - Implementar metodo de pausa
             else:
-                m1 = selected_qi
-                selected_qi = m1
+                selected_qi = i
                 # selected_qi = max((Q_MAX + 1), 0)
 
         msg.add_quality_id(self.qi[selected_qi])
