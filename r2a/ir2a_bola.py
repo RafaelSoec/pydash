@@ -65,19 +65,46 @@ class IR2A_BOLA(IR2A):
         selected_qi = 0
         for i in range(QTD_FORMAT):
             #   função de utilidade logarítmica
-            vM = np.log(self.qi[i] / self.qi[0])
-
-            m_actual = ((PARAM * vM) + (PARAM * GAMMA_PARAMETER) -
+            self.vM = np.log(self.qi[i] / self.qi[0])
+            m_actual = ((PARAM * self.vM) + (PARAM * GAMMA_PARAMETER) -
                         current_buffer[1]) / self.qi[i]
 
             # Define o maior valor para a variavel m_actual
             if m < m_actual:
                 m = m_actual
                 selected_qi = i
-            # TODO - Implementar metodo de pausa
-            else:
-                selected_qi = 0
-                # selected_qi = max((Q_MAX + 1), 0)
+
+                # salva em playback_qi = A lista com o índice de qualidade do vídeo
+                playback_qi = self.whiteboard.get_playback_qi()
+                # Verifica a lista com o índice de qualidade do vídeo
+                if len(playback_qi) > 0:
+                    ind_seg_ant = playback_qi[-1][1]
+                    # Verifica se indice de qualidade definido é maior que o indice do segmento anterior,
+                    if selected_qi > ind_seg_ant:
+                        m1 = 0
+                        max = self.qi[0]
+                        if (self.throughput >= self.qi[0]):
+                            max = self.throughput
+                        for j in range(QTD_FORMAT):
+                            if (m1 <= j and self.qi[j] <= max):
+                                m1 = j
+                        # O indice é setado com um novo valor caso ele esteja incluido nos  indices antigos
+                        # Pro caso contrário o indice é setado com o valor do indice antigo
+                        if (m1 < ind_seg_ant):
+                            m1 = ind_seg_ant
+                        elif (m1 >= m):
+                            m1 = selected_qi
+                        # TODO - Implementar metodo de pausa
+                        # elif (self.qi[i] > (GAMMA_PARAMETER * self.qi[0])):
+                        #     next_vM = np.log(self.qi[i+1] / self.qi[i])
+                        #     m_next = ((PARAM * next_vM) + (PARAM * GAMMA_PARAMETER) -
+                        #               current_buffer[1]) / self.qi[i]
+                        #     while m_actual > m_next:
+                        #           current_time = self.timer.get_current_time()
+                        #           self.pause_started_at = current_time
+                        else:
+                            m1 += 1
+                        selected_qi = m1
 
         msg.add_quality_id(self.qi[selected_qi])
         self.send_down(msg)
