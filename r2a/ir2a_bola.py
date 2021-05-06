@@ -1,5 +1,6 @@
 from r2a.ir2a import IR2A
 from player.parser import *
+from base.timer import Timer
 import numpy as np
 import time
 
@@ -15,6 +16,8 @@ class IR2A_BOLA(IR2A):
         self.throughput = 0
         self.request_time = 0
         self.vM = 0
+        self.timer = Timer.get_instance()
+        self.pause_started_at = None
 
     def handle_xml_request(self, msg):
         self.send_down(msg)
@@ -40,11 +43,7 @@ class IR2A_BOLA(IR2A):
 
         #  GAMMA_PARAMETER corresponde à intensidade com que queremos evitar o rebuffering.
         #  TODO -  Poderia ser um valor dinamico, mas por simplicidade esta sendo inicializado manualmente
-        GAMMA_PARAMETER = 3
-
-        # time.perf_counter() retorna o tempo em que a mensagem será encaminhada para o singletton ConnectionHandler
-        # request_time será usada posteriormente para calcular o valor de throughput
-        self.request_time = time.perf_counter()
+        GAMMA_PARAMETER = 4
 
         # Um desafio de implantação envolve a escolha do BOLA parâmetros γ(GAMMA_PARAMETER) e V(PARAM).
         # Parâmetro de controle definido pelo Bola para possibilitar troca entre o tamanho do buffer e desempenho
@@ -57,6 +56,10 @@ class IR2A_BOLA(IR2A):
             buffers = ([0, 0], [0, 0])
         # Seleciona o valor mais atual para o nível do buffer
         current_buffer = buffers[-1]
+
+        # time.perf_counter() retorna o tempo em que a mensagem será encaminhada para o singletton ConnectionHandler
+        # request_time será usada posteriormente para calcular o valor de throughput
+        self.request_time = time.perf_counter()
 
         # Escolhe o indice de qualidade
         # m = taxa de bits
@@ -81,37 +84,42 @@ class IR2A_BOLA(IR2A):
                     ind_seg_ant = playback_qi[-1][1]
                     # Verifica se indice de qualidade definido é maior que o indice do segmento anterior,
                     if selected_qi > ind_seg_ant:
-                        m1 = 0
-                        max = self.qi[0]
+                        m_line = 0
+                        max_val = self.qi[0]
                         if (self.throughput >= self.qi[0]):
-                            max = self.throughput
+                            max_val = self.throughput
                         for j in range(QTD_FORMAT):
-                            if (m1 <= j and self.qi[j] <= max):
-                                m1 = j
+                            if (m_line <= j and self.qi[j] <= max_val):
+                                m_line = j
                         # O indice é setado com um novo valor caso ele esteja incluido nos  indices antigos
                         # Pro caso contrário o indice é setado com o valor do indice antigo
-                        if (m1 < ind_seg_ant):
-                            m1 = ind_seg_ant
-                        elif (m1 >= m):
-                            m1 = selected_qi
-                        # TODO - Implementar metodo de pausa
-                        # elif (self.qi[i] > (GAMMA_PARAMETER * self.qi[0])):
-                        #     next_vM = np.log(self.qi[i+1] / self.qi[i])
-                        #     m_next = ((PARAM * next_vM) + (PARAM * GAMMA_PARAMETER) -
-                        #               current_buffer[1]) / self.qi[i]
-                        #     while m_actual > m_next:
-                        #           current_time = self.timer.get_current_time()
-                        #           self.pause_started_at = current_time
+                        if (m_line < ind_seg_ant):
+                            m_line = ind_seg_ant
+                        elif (m_line >= m):
+                            m_line = selected_qi
+                        # TODO - Verificar metodo de pausa
+                        # Verifica se houve uma oscilação grande entre o ultimo inndice e o indice anterior
+                        # elif (m_line > (GAMMA_PARAMETER + ind_seg_ant)):
+                        #     selected_qi = ind_seg_ant
+                        #     if(i+1 < QTD_FORMAT):
+                        #         next_vM = np.log(self.qi[i+1] / self.qi[i])
+                        #         m_next = ((PARAM * next_vM) + (PARAM * GAMMA_PARAMETER) -
+                        #                   current_buffer[1]) / self.qi[i+1]
+
+                        #         if m_actual > m_next:
+                        #             continue
                         else:
-                            m1 += 1
-                        selected_qi = m1
+                            m_line += 1
+
+                        selected_qi = m_line
+            else:
+                self.pause_started_at = None
+                self.buffer = [0, 0]
 
         msg.add_quality_id(self.qi[selected_qi])
         self.send_down(msg)
 
     def handle_segment_size_response(self, msg):
-        self.vM = np.log(msg.get_quality_id() / self.qi[0])
-
         # tempDuracao = tempo de duração entre a ida e a volta da mensagem ao ConnectionHandler
         tempDuracao = time.perf_counter() - self.request_time
 
