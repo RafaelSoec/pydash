@@ -34,8 +34,6 @@ def find_best_data_rate(avgDataRate, qi):
     for r in qi:
         if r < avgDataRate:
             result = r
-        else:
-            break
     print(f'result: {result}')
     return result
 
@@ -48,7 +46,9 @@ class R2APandaBased(IR2A):
         self.avgDataRate = []
         self.targetAvgDataRate = []
         self.measuredDataRate = []
-        self.interRequestTime = [0.001, 0.001]
+        self.interRequestTime = [0.01, 0.01]
+        self.targetInterRequestTime = [0.01, 0.01]
+        self.segmentDownloadDuration = [0.01, 0.01]
         self.time = 0
 
     def handle_xml_request(self, msg):
@@ -59,26 +59,41 @@ class R2APandaBased(IR2A):
         self.parsed_mpd = parse_mpd(msg.get_payload())
         self.qi = self.parsed_mpd.get_qi()
 
-        self.measuredDataRate = [self.qi[0], self.qi[0]]
-        self.targetAvgDataRate = [self.qi[0], self.qi[0]]
+        self.measuredDataRate = [self.qi[19], self.qi[19]]
+        self.targetAvgDataRate = [self.qi[19], self.qi[19]]
 
         self.send_up(msg)
 
     def handle_segment_size_request(self, msg):
-        self.time = time.time()
+        # Atualizando os tempos de download
+        self.interRequestTime[PENULT] = self.interRequestTime[LAST]
+        self.interRequestTime[LAST] = max(self.segmentDownloadDuration[LAST], self.targetInterRequestTime[LAST])
         
+        # Estimando a largura de banda compartilhada
         temp = self.targetAvgDataRate[LAST]
         self.targetAvgDataRate[LAST] = self.targetAvgDataRate[PENULT] + self.interRequestTime[PENULT]*probeCongergenceRate*(probeAdditiveIncBitrate - max(0, self.targetAvgDataRate[PENULT] - self.measuredDataRate[PENULT] + probeAdditiveIncBitrate))
         self.targetAvgDataRate[PENULT] = temp
         
         # time to define the segment quality choose to make the request
         msg.add_quality_id(find_best_data_rate(self.targetAvgDataRate[LAST], self.qi))
+
+        # Esperando até dá a hora para a próxima requisição
+        if time.perf_counter() < (self.time + self.interRequestTime[LAST]):
+            time.sleep(self.time + self.interRequestTime[LAST] - time.perf_counter())
+
+        self.time = time.perf_counter()
         self.send_down(msg)
 
     def handle_segment_size_response(self, msg):
+        elapsedTime = time.perf_counter() - self.time
+
+        # Atualizando o tempo percorrido
+        self.segmentDownloadDuration[PENULT] = self.segmentDownloadDuration[LAST]
+        self.segmentDownloadDuration[LAST] = elapsedTime
+
         # Atualizando as velocidades
         self.measuredDataRate[PENULT] = self.measuredDataRate[LAST]
-        self.measuredDataRate[LAST] = msg.get_bit_length() / (time.time() - self.time)
+        self.measuredDataRate[LAST] = msg.get_bit_length() / elapsedTime
         self.send_up(msg)
 
     def initialize(self):
