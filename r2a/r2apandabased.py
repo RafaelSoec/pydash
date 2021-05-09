@@ -46,8 +46,9 @@ class R2APandaBased(IR2A):
         self.parsed_mpd = ''
         self.qi = []
         self.avgDataRate = []
+        self.targetAvgDataRate = []
         self.measuredDataRate = []
-        self.interRequestTime = 0.001
+        self.interRequestTime = [0.001, 0.001]
         self.time = 0
 
     def handle_xml_request(self, msg):
@@ -59,13 +60,19 @@ class R2APandaBased(IR2A):
         self.qi = self.parsed_mpd.get_qi()
 
         self.measuredDataRate = [self.qi[0], self.qi[0]]
+        self.targetAvgDataRate = [self.qi[0], self.qi[0]]
 
         self.send_up(msg)
 
     def handle_segment_size_request(self, msg):
         self.time = time.time()
+        
+        temp = self.targetAvgDataRate[LAST]
+        self.targetAvgDataRate[LAST] = self.targetAvgDataRate[PENULT] + self.interRequestTime[PENULT]*probeCongergenceRate*(probeAdditiveIncBitrate - max(0, self.targetAvgDataRate[PENULT] - self.measuredDataRate[PENULT] + probeAdditiveIncBitrate))
+        self.targetAvgDataRate[PENULT] = temp
+        
         # time to define the segment quality choose to make the request
-        msg.add_quality_id(find_best_data_rate(self.measuredDataRate[LAST], self.qi))
+        msg.add_quality_id(find_best_data_rate(self.targetAvgDataRate[LAST], self.qi))
         self.send_down(msg)
 
     def handle_segment_size_response(self, msg):
