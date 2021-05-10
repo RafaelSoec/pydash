@@ -43,7 +43,8 @@ class IR2A_BOLA(IR2A):
 
         #  GAMMA_PARAMETER corresponde à intensidade com que queremos evitar o rebuffering.
         #  TODO -  Poderia ser um valor dinamico, mas por simplicidade esta sendo inicializado manualmente
-        GAMMA_PARAMETER = 4
+        # GAMMA_PARAMETER = 7
+        GAMMA_PARAMETER = self.timer.get_started_time()
 
         # Um desafio de implantação envolve a escolha do BOLA parâmetros γ(GAMMA_PARAMETER) e V(PARAM).
         # Parâmetro de controle definido pelo Bola para possibilitar troca entre o tamanho do buffer e desempenho
@@ -65,7 +66,7 @@ class IR2A_BOLA(IR2A):
         # m = taxa de bits
         # Param = Vd, Sm = self.qi[i], S1 = self.qi[0]
         m = 0
-        selected_qi = 0
+        selected_qi = 1
         for i in range(QTD_FORMAT):
             #   função de utilidade logarítmica
             self.vM = np.log(self.qi[i] / self.qi[0])
