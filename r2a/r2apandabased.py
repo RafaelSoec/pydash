@@ -39,15 +39,10 @@ def find_best_data_rate(avgDataRate, qi):
     return result
 
 def smooth_data_rate(*data_rates):
-    size = len(data_rates)
     result = 0
-    others_weight = (1 - LAST_WEIGHT)/(size - 1)
-    for i in range(size):
-        if i == (size - 1):
-            result += data_rates[i]*LAST_WEIGHT
-        else:
-            result += data_rates[i]*others_weight
-    return result
+    for dr in data_rates:
+        result += dr
+    return result/len(data_rates)
 
 class R2APandaBased(IR2A):
 
@@ -87,7 +82,6 @@ class R2APandaBased(IR2A):
         self.send_up(msg)
 
     def handle_segment_size_request(self, msg):
-        print('started...')
         # Estimando a largura de banda compartilhada
         temp = self.targetAvgDataRate[LAST]
         MI = 0
@@ -105,7 +99,7 @@ class R2APandaBased(IR2A):
 
         # Refinando o valor obitido para a taxa de transferência calculada acima
         self.targetAvgDataRate[LAST] = smooth_data_rate(self.targetAvgDataRate[PENULT], self.targetAvgDataRate[LAST])
-        
+
         print('\n--------------------------------')
         print(f'times: {self.interRequestTime[PENULT]}, {self.interRequestTime[LAST]}')
         print(f'data rates: {self.targetAvgDataRate[PENULT]}, {self.targetAvgDataRate[LAST]}')
@@ -128,7 +122,6 @@ class R2APandaBased(IR2A):
             time.sleep(self.request_time + self.interRequestTime[LAST] - time.perf_counter())
 
         self.request_time = time.perf_counter()
-        print('ended...')
         self.send_down(msg)
 
     def handle_segment_size_response(self, msg):
