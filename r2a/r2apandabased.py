@@ -1,15 +1,10 @@
 """
-@author: Kálley Wilkerson Rodrigues Alexandre 170038050
-@author: Rafael 
+@author: Kálley Wilkerson Rodrigues Alexandre - 170038050
+@author: Rafael Oliveira de Souza - 150081537
 
 @description: PyDash Project
 
 An implementation example of an R2A Algorithm based on the Panda algorithm.
-
-the quality list is obtained with the parameter of handle_xml_response() method and the choice
-is made inside of handle_segment_size_request(), before sending the message down.
-
-In this algorithm the quality choice is always the same.
 """
 
 from player.parser import *

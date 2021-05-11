@@ -1,3 +1,12 @@
+"""
+@author: Rafael Oliveira de Souza - 150081537 
+@author: Kálley Wilkerson Rodrigues Alexandre - 170038050
+
+@description: PyDash Project
+
+An implementation example of an R2A Algorithm based on the Bola algorithm.
+"""
+
 from r2a.ir2a import IR2A
 from player.parser import *
 from base.timer import Timer
