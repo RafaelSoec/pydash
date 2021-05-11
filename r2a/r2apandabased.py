@@ -21,8 +21,8 @@ PENULT = 0
 LAST = 1
 
 # Parâmetros criados
-MI_PARAM = 30000
-LAST_WEIGHT = 0.7
+MI_PARAM = 25000
+LAST_WEIGHT = 0.6
 
 probeAdditiveIncBitrate = 0.3
 # Valores possíveis: 0.04,0.07,0.14,0.28,0.42,0.56
@@ -88,7 +88,7 @@ class R2APandaBased(IR2A):
         if self.interRequestTime[PENULT] < 1:
             MI = MI_PARAM/self.interRequestTime[PENULT]
         else:
-            MI = MI_PARAM/(7*self.interRequestTime[PENULT])
+            MI = MI_PARAM/(5*self.interRequestTime[PENULT])
         AIMD = probeCongergenceRate*(probeAdditiveIncBitrate - max(0, self.targetAvgDataRate[PENULT] - self.measuredDataRate[PENULT] + probeAdditiveIncBitrate))
         self.targetAvgDataRate[LAST] = self.targetAvgDataRate[PENULT] + self.interRequestTime[PENULT]*AIMD + MI
         self.targetAvgDataRate[PENULT] = temp
